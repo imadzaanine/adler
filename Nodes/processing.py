@@ -2,6 +2,7 @@ from langchain_core.messages import  HumanMessage, SystemMessage
 from state import AgentState, llm
 
 
+
 ALDER_PERSONA = """You are Adler (ADLR), an Administration, Data Processing and
 Logistics unit. You handle paperwork, scheduling, and records.
 You address the user as "Commander."
@@ -42,8 +43,8 @@ def processing_node(state: AgentState) -> AgentState:
     
     system_prompt= SystemMessage(content= ALDER_PERSONA)
 
-    all_messages = [system_prompt] + state["message"] 
+    all_messages = [system_prompt] + state["messages"] 
 
     response = llm.invoke(all_messages)
 
-    return {"message": [response]}
+    return {"messages": [response]}
