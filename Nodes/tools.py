@@ -50,7 +50,7 @@ def send_email(to: str, subject:str, body:str) -> str :
 
 
 @tool
-def create_event_in_calendar(summary:str, description:str, startTime:str, endTime:str):
+def create_event_in_calendar( summary:str, description:str, startTime:str, endTime:str):
     """
     This tool creates an event in the calendar
 
@@ -67,13 +67,13 @@ def create_event_in_calendar(summary:str, description:str, startTime:str, endTim
     calendar = get_calendar_service()
 
     event = {
-        "summay": "Meeting with alex",
-        "description": "Discuss the project",
+        "summary": summary,
+        "description": description,
         "start": {
-            "dateTime": "2026-10-10T14:00:00+02:00"
+            "dateTime": startTime
         },
         "end": {
-            "dateTime": "2026-10-10T15:00:00+02:00"
+            "dateTime": endTime
             }
         
     }
