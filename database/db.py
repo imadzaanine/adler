@@ -9,11 +9,8 @@ load_dotenv()
 
 
 def get_conn() -> psycopg.Connection:
-    print("connecting...")
     conn = psycopg.connect(os.environ["DATABASE_URL"], autocommit=True, connect_timeout=5)
-    print("connected")
     register_vector(conn)
-    print("vector registered")
     return conn
 
 
@@ -53,19 +50,36 @@ def insert_chunks(conn, email_id, user_id: str, chunks: list, model_name: str):
         )
 
 
-def search_chunks(conn, user_id: str, qvec: list, k: int):
-    """Find the k closest chunks for this user. Returns [(email_id, chunk_idx, distance)]."""
+def search_chunks(conn, user_id: str, qvec: list, k: int, after=None, before=None):
+    """Find the k closest chunks for this user, optionally limited to a date range."""
     return conn.execute(
         """
-        SELECT email_id, chunk_idx, embedding <=> %s AS dist
-        FROM email_chunks
-        WHERE user_id = %s
+        SELECT c.email_id, c.chunk_idx, c.embedding <=> %s AS dist
+        FROM email_chunks c
+        JOIN emails e ON e.id = c.email_id
+        WHERE c.user_id = %s
+          AND (%s::timestamptz IS NULL OR e.sent_at >= %s::timestamptz)
+          AND (%s::timestamptz IS NULL OR e.sent_at <  %s::timestamptz)
         ORDER BY dist
         LIMIT %s
         """,
-        (np.array(qvec), user_id, k),
+        (np.array(qvec), user_id, after, after, before, before, k),
     ).fetchall()
 
+def list_emails(conn, user_id: str, after=None, before=None, limit: int = 10):
+    """Newest first, no vector search. Returns a list of email ids."""
+    rows = conn.execute(
+        """
+        SELECT id FROM emails
+        WHERE user_id = %s
+          AND (%s::timestamptz IS NULL OR sent_at >= %s::timestamptz)
+          AND (%s::timestamptz IS NULL OR sent_at <  %s::timestamptz)
+        ORDER BY sent_at DESC
+        LIMIT %s
+        """,
+        (user_id, after, after, before, before, limit),
+    ).fetchall()
+    return [r[0] for r in rows]
 
 def fetch_emails(conn, user_id: str, email_ids: list):
     """Load email rows (still encrypted) for this user."""

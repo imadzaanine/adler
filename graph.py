@@ -1,3 +1,5 @@
+from dotenv import load_dotenv
+load_dotenv()
 from langgraph.graph import StateGraph, START, END
 from Nodes.processing import processing_node
 from state import AgentState
@@ -7,10 +9,6 @@ from langgraph.checkpoint.memory import MemorySaver
 from Nodes.tools import tools
 from Helpers.should_continue import should_continue
 import os
-from dotenv import load_dotenv
-
-
-load_dotenv()
 
 memory = MemorySaver()
 graph = StateGraph(AgentState)

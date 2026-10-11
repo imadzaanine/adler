@@ -9,6 +9,16 @@ from database.db import get_conn
 from mailhandler.store import search
 import os  
 from dotenv import load_dotenv
+import time
+
+
+_conn = None
+
+def _get_conn():
+    global _conn
+    if _conn is None or _conn.closed:
+        _conn = get_conn()
+    return _conn
 
 
 load_dotenv()
@@ -96,15 +106,14 @@ def get_current_time():
     return datetime.now(ZoneInfo("Africa/Algiers")).isoformat()
 
 @tool
-def retireve_from_email(query:str, limit:int) -> str :
+def retireve_from_email(query:str) -> str :
     """this tool acess the email databse and do a vector search to retireve emails
 
     Arg:
     query: the query that needs emails for a response
-    limit: the number of chunks to be retrieved
     """
     conn = get_conn()
-    results = search(conn,os.environ["ADLER_USER_ID"],query,limit)
+    results = search(conn,os.environ["ADLER_USER_ID"],query,limit=5)
 
     if not results:
         return "No email matches"
