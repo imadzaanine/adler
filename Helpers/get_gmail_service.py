@@ -9,7 +9,10 @@ SEND_SCOPES = [
     "https://www.googleapis.com/auth/gmail.send",
     "https://www.googleapis.com/auth/calendar.events",
 ]
-READ_SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
+READ_SCOPES = [
+    "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/pubsub",
+]
 
 
 def get_credentials(scopes, token_file):
@@ -33,7 +36,7 @@ def get_gmail_service():                 # sending (agent)
 
 
 def get_gmail_read_service():            # reading (ingestion only)
-    return build("gmail", "v1", credentials=get_credentials(READ_SCOPES, "token.json"))
+    return build("gmail", "v1", credentials=get_credentials(READ_SCOPES, "token_read.json"))
 
 
 def get_calendar_service():
