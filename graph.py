@@ -6,6 +6,11 @@ from langgraph.prebuilt import ToolNode
 from langgraph.checkpoint.memory import MemorySaver
 from Nodes.tools import tools
 from Helpers.should_continue import should_continue
+import os
+from dotenv import load_dotenv
+
+
+load_dotenv()
 
 memory = MemorySaver()
 graph = StateGraph(AgentState)
@@ -33,7 +38,8 @@ app = graph.compile(checkpointer = memory)
 
 config = {
     "configurable":{
-    "thread_id":"commander"
+    "thread_id":"commander",
+    "user_id": os.environ["ADLER_USER_ID"]
     }
 }
 

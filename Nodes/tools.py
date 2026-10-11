@@ -5,7 +5,13 @@ from Helpers.get_gmail_service import get_calendar_service
 from langchain_core.tools import tool
 from datetime import datetime
 from zoneinfo import ZoneInfo
+from database.db import get_conn
+from mailhandler.store import search
+import os  
+from dotenv import load_dotenv
 
+
+load_dotenv()
 
 @tool
 def send_email(to: str, subject:str, body:str) -> str :
@@ -89,4 +95,31 @@ def get_current_time():
     """Returns the current date and time."""
     return datetime.now(ZoneInfo("Africa/Algiers")).isoformat()
 
-tools = [send_email, create_event_in_calendar, get_current_time]
+@tool
+def retireve_from_email(query:str, limit:int) -> str :
+    """this tool acess the email databse and do a vector search to retireve emails
+
+    Arg:
+    query: the query that needs emails for a response
+    limit: the number of chunks to be retrieved
+    """
+    conn = get_conn()
+    results = search(conn,os.environ["ADLER_USER_ID"],query,limit)
+
+    if not results:
+        return "No email matches"
+
+    blocks = []
+    for r in results:
+        blocks.append(
+            f"Email ID: {r['id']}\n"
+            f"Date: {r['sent_at']}\n"
+            f"From: {r['sender']}\n"
+            f"Subject: {r['subject']}\n"
+            f"Snippet: {r['snippet']}"
+        )
+    return "\n\n".join(blocks)
+
+    
+
+tools = [send_email, create_event_in_calendar, get_current_time, retireve_from_email]
