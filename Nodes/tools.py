@@ -140,3 +140,6 @@ def retrieve_from_email(query: str = "", after: str | None = None,
     return "\n\n".join(blocks)
 
 tools = [send_email, create_event_in_calendar, get_current_time, retrieve_from_email]
+memory_tools = [get_current_time, retrieve_from_email]
+email_tools = [send_email, get_current_time]
+calendar_tools = [get_current_time, create_event_in_calendar]
