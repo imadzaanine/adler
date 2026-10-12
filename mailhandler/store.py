@@ -1,7 +1,7 @@
 import uuid
 
 from mailhandler.crypto import encrypt_email, decrypt_email
-from database.db import insert_email, insert_chunks, search_chunks, fetch_emails
+from database.db import insert_email, insert_chunks, search_chunks, fetch_emails, list_emails
 from mailhandler.embed import embed, EMBED_MODEL
 
 
@@ -52,32 +52,43 @@ def save_email(conn, user_id, email: dict) -> bool:
     return True
 
 
-def search(conn, user_id, query: str, limit: int = 5) -> list[dict]:
-    """Find the emails that best match the query, decrypted."""
+def search(conn, user_id, query: str = "", limit: int = 5,
+           after=None, before=None, newest_first: bool = False) -> list[dict]:
+    """Find emails. With a query: vector search. With newest_first: re-sort the matches by date."""
     user_id = _norm(user_id)
 
-    # 1. Embed the question and find the closest chunks
-    qvec = embed(query)
-    hits = search_chunks(conn, user_id, qvec, limit * 3)
+    if query and query.strip():
+        # when we sort by date afterwards, look at more candidates so the newest one isn't missed
+        pool = max(limit * 10, 40) if newest_first else limit * 3
+        hits = search_chunks(conn, user_id, embed(query), pool, after, before)
 
-    # 2. Several chunks can belong to one email, so keep the best distance per email
-    best = {}
-    for email_id, _chunk_idx, dist in hits:
-        if email_id not in best or dist < best[email_id]:
-            best[email_id] = dist
-    ranked = sorted(best.items(), key=lambda item: item[1])[:limit]
+        best = {}
+        for email_id, _chunk_idx, dist in hits:
+            if email_id not in best or dist < best[email_id]:
+                best[email_id] = dist
+        ranked = sorted(best.items(), key=lambda item: item[1])
+        if not newest_first:
+            ranked = ranked[:limit]
+        else:
+            ranked = ranked[:max(limit * 4, 20)]       # keep the most relevant ones, sort by date below
+    else:
+        ids = list_emails(conn, user_id, after, before, limit)   # already newest first
+        ranked = [(i, 0.0) for i in ids]
+
     if not ranked:
         return []
 
-    # 3. Load the encrypted rows and decrypt them
     rows = fetch_emails(conn, user_id, [email_id for email_id, _ in ranked])
     by_id = {row["id"]: row for row in rows}
+    ranked = [(i, d) for i, d in ranked if i in by_id]
+
+    if newest_first or not (query and query.strip()):
+        ranked.sort(key=lambda item: by_id[item[0]]["sent_at"], reverse=True)
+    ranked = ranked[:limit]
 
     results = []
     for email_id, dist in ranked:
-        row = by_id.get(email_id)
-        if row is None:
-            continue
+        row = by_id[email_id]
         data = decrypt_email(row["ciphertext"], row["nonce"], user_id, row["provider_id"])
         results.append({
             "id": str(email_id),

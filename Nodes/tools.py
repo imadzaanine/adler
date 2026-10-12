@@ -106,14 +106,24 @@ def get_current_time():
     return datetime.now(ZoneInfo("Africa/Algiers")).isoformat()
 
 @tool
-def retireve_from_email(query:str) -> str :
-    """this tool acess the email databse and do a vector search to retireve emails
+def retrieve_from_email(query: str = "", after: str | None = None,
+                        before: str | None = None, newest_first: bool = False,
+                        limit: int = 5) -> str:
+    """Search the user's emails.
 
-    Arg:
-    query: the query that needs emails for a response
+    Args:
+        query: topic, sender or keywords. Leave empty to list emails purely by date.
+        after: only emails on or after this moment, ISO format with timezone,
+               e.g. 2026-10-05T00:00:00+01:00
+        before: only emails before this moment, same format.
+        newest_first: set true when the user asks for the latest or most recent email.
+        limit: how many emails to return (max 10).
+
+    For relative dates such as "last week" or "yesterday", call get_current_time, then compute the range yourself.
     """
-    conn = get_conn()
-    results = search(conn,os.environ["ADLER_USER_ID"],query,limit=5)
+    limit = max(1, min(limit, 10))
+    conn = _get_conn()
+    results = search(conn, os.environ["ADLER_USER_ID"], query, limit, after, before, newest_first)
 
     if not results:
         return "No email matches"
@@ -129,6 +139,4 @@ def retireve_from_email(query:str) -> str :
         )
     return "\n\n".join(blocks)
 
-    
-
-tools = [send_email, create_event_in_calendar, get_current_time, retireve_from_email]
+tools = [send_email, create_event_in_calendar, get_current_time, retrieve_from_email]
