@@ -1,98 +1,54 @@
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+from langchain.agents import create_agent
+from langchain_core.messages import HumanMessage, ToolMessage
+
 from state import AgentState, llm
 from Nodes.tools import calendar_tools
-from langchain.agents import create_agent
-from langchain_core.messages import SystemMessage,HumanMessage
+from Helpers.context_message import context_message
+
+
 
 SYSTEM_PROMPT = """
+You are the Calendar Agent.
 
-You are the Calendar Agent in a multi-agent AI system.
+Your only responsibility is creating calendar events.
 
-Your responsibility is to handle calendar-related tasks requested by the user.
+You do not:
+- decide workflow
+- answer users
+- send emails
+- retrieve emails
 
-You are a specialized worker. You do not decide which agent should run next, you do not manage the workflow, and you do not provide the final response to the user. Your only responsibility is to execute calendar tasks assigned by the Supervisor Agent.
 
-Your available tools:
+Tool:
+create_event_in_calendar
 
-1. create_event_in_calendar
-- Use this tool to create calendar events.
-- Ensure event details are correct before creating an event.
-- Include all available information such as title, date, time, duration, attendees, and description.
 
-2. get_current_time
-- Use this tool when you need the current date or time.
-- Use it to resolve relative time expressions such as:
-  - "today"
-  - "tomorrow"
-  - "next week"
-  - "this Friday"
+Rules:
 
-Your responsibilities:
+Defaults:
+- Duration: 1 hour
+- Optional location and description can be omitted
 
-- Create calendar events based on the user's request.
-- Interpret scheduling requests accurately.
-- Use context provided by other agents.
-- Verify that all required information is available before creating an event.
-- Report the result of calendar operations.
+Required:
+- A date
+- A time
 
-Before creating an event, verify:
+If the date or time cannot be determined:
+Return that information is missing.
 
-- Event title or purpose is known.
-- Date is known or can be resolved.
-- Time is known or can be resolved.
-- Required attendees are available if needed.
+Never invent dates or times.
 
-If information is missing:
 
-- Do not guess.
-- Do not create incomplete events.
-- Explain what information is missing.
-- Return the missing requirements so the Supervisor Agent can decide the next action.
-
-You may receive information from:
-
-- Memory Agent:
-  Previous emails, conversations, or scheduling context.
-
-- Email Agent:
-  Information about recipients or communication details.
-
-Use this context when creating events.
-
-Examples:
-
-User request:
-"Schedule a meeting with John tomorrow at 3 PM."
-
-Expected behavior:
-1. Determine the event details.
-2. Use get_current_time if needed to resolve "tomorrow".
-3. Call create_event_in_calendar.
-4. Return the event creation result.
-
-User request:
-"Set up a meeting with Sarah."
-
-If no date or time exists:
-Do not create an event.
+After creating an event:
 Return:
-"Missing meeting date and time."
-
-Important rules:
-
-- Only perform calendar-related tasks.
-- Never send emails.
-- Never retrieve emails.
-- Never decide the next agent.
-- Never answer the user directly.
-- Never call tools unless they are required for the calendar task.
-
-After completing the task, return a concise summary of:
-
-- Whether the event was created successfully.
-- Event title.
-- Date and time.
-- Event identifier if available.
-- Any remaining issues.
+- title
+- date
+- time
+- attendee
+- event link
 """
 
 
@@ -103,23 +59,94 @@ calendar_agent = create_agent(
 )
 
 
+
 def Calendar_Agent_node(state: AgentState) -> dict:
-    """This is the calendar agent. It creates calendar events using create_event_in_calendar."""
+
+
+    now = datetime.now(
+        ZoneInfo("Africa/Algiers")
+    )
+
+
+    date_msg = HumanMessage(
+        content=
+        f"[Current date and time: "
+        f"{now.strftime('%A %Y-%m-%d %H:%M')} UTC+1]"
+    )
+
+
+    msgs = [
+        *state["messages"],
+        date_msg
+    ]
+
+
+    ctx = context_message(state)
+
+    if ctx:
+        msgs.append(ctx)
+
 
     response = calendar_agent.invoke(
         {
-            "messages": state["messages"]
+            "messages": msgs
         }
     )
 
+
     final_message = response["messages"][-1]
 
+
+    created = any(
+        isinstance(m, ToolMessage)
+        and m.name == "create_event_in_calendar"
+        and getattr(m, "status", "success") != "error"
+        and "Event created" in str(m.content)
+        for m in response["messages"]
+    )
+
+
+    if created:
+
+        return {
+
+            "calendar_result": {
+                "status": "COMPLETED",
+                "summary": str(final_message.content),
+                "missing_fields": []
+            },
+
+            "workflow_status": "RUNNING",
+
+            "active_agent": None,
+
+            "pending_request": None
+        }
+
+
+
     return {
+
         "calendar_result": {
-            "success": True,
-            "summary": final_message.content
+            "status": "WAITING_FOR_USER",
+            "summary": str(final_message.content),
+            "missing_fields": [
+                "date_or_time"
+            ]
         },
-        "completed_tasks": [
-            "Calendar_completed"
-        ]
+
+
+        "workflow_status": "WAITING_FOR_USER",
+
+        "active_agent": "CALENDAR",
+
+        "pending_request": {
+
+            "agent": "CALENDAR",
+
+            "missing_fields": [
+                "date_or_time"
+            ]
+
+        }
     }

@@ -105,7 +105,7 @@ def get_current_time():
     """Returns the current date and time."""
     return datetime.now(ZoneInfo("Africa/Algiers")).isoformat()
 
-@tool
+@tool(return_direct=True)
 def retrieve_from_email(query: str = "", after: str | None = None,
                         before: str | None = None, newest_first: bool = False,
                         limit: int = 5) -> str:
